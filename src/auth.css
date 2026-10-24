@@ -1,0 +1,122 @@
+/* StockGuard authentication page; existing index.css remains unchanged. */
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 28px 18px;
+  background: #f5f3eb;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  padding: 36px;
+  background: #fffefa;
+  border: 1px solid #e6e2d7;
+  border-radius: 18px;
+  box-shadow: 0 18px 55px rgba(31, 55, 41, 0.08);
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 42px;
+}
+
+.auth-brand-mark {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  color: #fffefa;
+  background: #234d39;
+  border-radius: 12px;
+}
+
+.auth-heading { margin-bottom: 26px; }
+
+.auth-heading h1 {
+  margin: 10px 0;
+  color: #234d39;
+  font-size: clamp(27px, 5vw, 34px);
+  letter-spacing: -1px;
+}
+
+.auth-heading p {
+  color: #77796f;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.auth-form { display: grid; gap: 19px; }
+
+.auth-form label {
+  display: grid;
+  gap: 8px;
+  color: #37443a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.auth-form input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 13px 14px;
+  color: #25372b;
+  background: #fff;
+  border: 1px solid #dddcd2;
+  border-radius: 9px;
+  font: inherit;
+  font-weight: 400;
+  outline: none;
+}
+
+.auth-form input:focus {
+  border-color: #52765c;
+  box-shadow: 0 0 0 3px rgba(82, 118, 92, 0.12);
+}
+
+.auth-submit {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.auth-error { margin-bottom: 18px; }
+
+.auth-switch {
+  margin-top: 24px;
+  color: #77796f;
+  text-align: center;
+  font-size: 13px;
+}
+
+.auth-switch button {
+  padding: 0;
+  color: #315c42;
+  background: none;
+  border: none;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-security {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 27px;
+  color: #77796f;
+  font-size: 11px;
+}
+
+.logout-button { white-space: nowrap; }
+
+@media (max-width: 480px) {
+  .auth-card { padding: 25px 21px; }
+  .auth-brand { margin-bottom: 32px; }
+  .logout-button { padding: 8px 10px; }
+}
