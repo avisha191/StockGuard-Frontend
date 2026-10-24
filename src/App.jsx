@@ -56,6 +56,7 @@ function App() {
   const [authPassword, setAuthPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [showLogin, setShowLogin] = useState(false);
 
   const [page, setPage] = useState("Dashboard");
   const [products, setProducts] = useState([]);
@@ -114,6 +115,7 @@ function App() {
       setToken(data.token);
       setAuthPassword("");
       setAuthError("");
+      setShowLogin(false);
     } catch (err) {
       setAuthError(err.message || "Could not connect to StockGuard.");
     } finally {
@@ -131,11 +133,14 @@ function App() {
     setError("");
     setAuthPassword("");
     setAuthError("");
+    setShowLogin(false);
   }
 
   useEffect(() => {
     const handleUnauthorized = () => {
       setToken("");
+      setPage("Dashboard");
+      setShowLogin(true);
       setAuthError("Your session expired. Please log in again.");
     };
     window.addEventListener("stockguard:unauthorized", handleUnauthorized);
@@ -146,12 +151,16 @@ function App() {
     setLoading(true);
     setError("");
     try {
-      const [productData, orderData] = await Promise.all([
-        request("/products"),
-        request("/orders"),
-      ]);
+      // The product catalogue is public; order data requires admin authentication.
+      const productData = await request("/products");
       setProducts(productData);
-      setOrders(orderData);
+
+      if (token) {
+        const orderData = await request("/orders");
+        setOrders(orderData);
+      } else {
+        setOrders([]);
+      }
     } catch (err) {
       setError(err.message || "Could not connect to StockGuard.");
     } finally {
@@ -160,13 +169,7 @@ function App() {
   }
 
   useEffect(() => {
-    if (token) {
-      loadData();
-    } else {
-      setLoading(false);
-      setProducts([]);
-      setOrders([]);
-    }
+    loadData();
   }, [token]);
 
   const totalUnits = products.reduce((sum, p) => sum + Number(p.stock || 0), 0);
@@ -295,10 +298,10 @@ function App() {
   const navigation = [
     { name: "Dashboard", icon: LayoutDashboard },
     { name: "Inventory", icon: Package },
-    { name: "Orders", icon: ShoppingCart },
+    ...(token ? [{ name: "Orders", icon: ShoppingCart }] : []),
   ];
 
-  if (!token) {
+  if (!token && showLogin) {
     return (
       <div className="auth-page">
         <div className="auth-card">
@@ -362,6 +365,13 @@ function App() {
             <CheckCircle2 size={15} />
             Passwords are securely hashed by the backend.
           </p>
+          <button
+            type="button"
+            className="button button-secondary auth-submit"
+            onClick={() => { setShowLogin(false); setAuthError(""); }}
+          >
+            Back to public dashboard
+          </button>
         </div>
       </div>
     );
@@ -432,9 +442,15 @@ function App() {
             <button className="icon-button refresh-button" onClick={loadData} title="Refresh data">
               <RefreshCw size={17} />
             </button>
-            <button className="button button-secondary logout-button" onClick={logout}>
-              Log out
-            </button>
+            {token ? (
+              <button className="button button-secondary logout-button" onClick={logout}>
+                Log out
+              </button>
+            ) : (
+              <button className="button button-primary" onClick={() => setShowLogin(true)}>
+                Admin log in
+              </button>
+            )}
             <div className="avatar">SG</div>
           </div>
         </header>
@@ -456,12 +472,27 @@ function App() {
               <button className="button button-secondary" onClick={loadData}>
                 <RefreshCw size={16} /> Refresh
               </button>
-              {page !== "Orders" && (
+              {!token && page !== "Orders" && (
+                <button
+                  className="button button-primary"
+                  onClick={() => {
+                    setOrderForm({
+                      productId: products.find((p) => Number(p.stock) > 0)?.id?.toString() || "",
+                      quantity: "1",
+                    });
+                    setModal("order");
+                  }}
+                  disabled={products.every((p) => Number(p.stock) <= 0)}
+                >
+                  <ShoppingCart size={17} /> Place test order
+                </button>
+              )}
+              {token && page !== "Orders" && (
                 <button className="button button-primary" onClick={openAddProduct}>
                   <Plus size={17} /> Add product
                 </button>
               )}
-              {page === "Orders" && (
+              {token && page === "Orders" && (
                 <button
                   className="button button-primary"
                   onClick={() => {
@@ -496,7 +527,7 @@ function App() {
                 <StatCard title="Total products" value={products.length} note="Products in catalogue" icon={Package} />
                 <StatCard title="Units in stock" value={totalUnits.toLocaleString("en-IN")} note="Across all products" icon={Boxes} />
                 <StatCard title="Inventory value" value={money(inventoryValue)} note="Current stock × price" icon={TrendingUp} />
-                <StatCard title="Active orders" value={activeOrders.length} note="Awaiting completion" icon={ShoppingCart} />
+                {token && <StatCard title="Active orders" value={activeOrders.length} note="Awaiting completion" icon={ShoppingCart} />}
               </section>
 
               <section className="dashboard-grid">
@@ -514,6 +545,7 @@ function App() {
                     products={products.slice(0, 5)}
                     onEdit={openEditProduct}
                     onDelete={deleteProduct}
+                    isAdmin={Boolean(token)}
                     compact
                   />
                   {!loading && products.length === 0 && <EmptyState text="No products yet. Add your first product." />}
@@ -571,7 +603,7 @@ function App() {
                 </div>
               </section>
 
-              <section className="panel orders-panel">
+              {token && <section className="panel orders-panel">
                 <div className="panel-heading">
                   <div>
                     <h2>Latest orders</h2>
@@ -583,7 +615,7 @@ function App() {
                 </div>
                 <OrderTable orders={orders.slice(0, 5)} onCancel={cancelOrder} />
                 {!loading && orders.length === 0 && <EmptyState text="Orders will appear here when you place one." />}
-              </section>
+              </section>}
             </>
           )}
 
@@ -599,9 +631,24 @@ function App() {
                   <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products..." />
                   {search && <button onClick={() => setSearch("")}><X size={15} /></button>}
                 </div>
+                {!token && (
+                  <button
+                    className="button button-primary"
+                    onClick={() => {
+                      setOrderForm({
+                        productId: products.find((p) => Number(p.stock) > 0)?.id?.toString() || "",
+                        quantity: "1",
+                      });
+                      setModal("order");
+                    }}
+                    disabled={products.every((p) => Number(p.stock) <= 0)}
+                  >
+                    <ShoppingCart size={17} /> Place test order
+                  </button>
+                )}
               </div>
               {loading ? <div className="loading-state">Loading inventory...</div> : (
-                <ProductTable products={filteredProducts} onEdit={openEditProduct} onDelete={deleteProduct} />
+                <ProductTable products={filteredProducts} onEdit={openEditProduct} onDelete={deleteProduct} isAdmin={Boolean(token)} />
               )}
               {!loading && filteredProducts.length === 0 && (
                 <EmptyState text={search ? "No products match your search." : "No products yet. Add your first product."} />
@@ -609,7 +656,7 @@ function App() {
             </section>
           )}
 
-          {page === "Orders" && (
+          {token && page === "Orders" && (
             <section className="panel full-panel">
               <div className="inventory-summary">
                 <div>
@@ -676,7 +723,7 @@ function App() {
             <div className="modal-heading">
               <div>
                 <span className="eyebrow">ORDER MANAGEMENT</span>
-                <h2>Create an order</h2>
+                <h2>{token ? "Create an order" : "Place a test order"}</h2>
               </div>
               <button type="button" className="icon-button" onClick={() => setModal("")}><X size={19} /></button>
             </div>
@@ -702,7 +749,7 @@ function App() {
                 </div>
               );
             })()}
-            <p className="form-hint">The backend verifies stock availability before accepting this order.</p>
+            <p className="form-hint">This test order updates inventory stock. The backend checks availability before accepting it.</p>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setModal("")}>Cancel</button>
               <button className="button button-primary" disabled={saving || products.every((p) => p.stock <= 0)}>
@@ -735,7 +782,7 @@ function StockBadge({ stock }) {
   return <span className="badge badge-in">In stock</span>;
 }
 
-function ProductTable({ products, onEdit, onDelete, compact = false }) {
+function ProductTable({ products, onEdit, onDelete, isAdmin = false, compact = false }) {
   return (
     <div className="table-scroll">
       <table>
@@ -746,7 +793,7 @@ function ProductTable({ products, onEdit, onDelete, compact = false }) {
             <th>PRICE</th>
             <th>STOCK</th>
             <th>STATUS</th>
-            <th className="actions-column">ACTIONS</th>
+            {isAdmin && <th className="actions-column">ACTIONS</th>}
           </tr>
         </thead>
         <tbody>
@@ -764,12 +811,14 @@ function ProductTable({ products, onEdit, onDelete, compact = false }) {
               <td className="price-cell">{money(p.price)}</td>
               <td><strong className="stock-number">{p.stock}</strong></td>
               <td><StockBadge stock={Number(p.stock)} /></td>
-              <td>
-                <div className="row-actions">
-                  <button className="row-action" title="Edit product" onClick={() => onEdit(p)}><Pencil size={15} /></button>
-                  <button className="row-action row-delete" title="Delete product" onClick={() => onDelete(p)}><Trash2 size={15} /></button>
-                </div>
-              </td>
+              {isAdmin && (
+                <td>
+                  <div className="row-actions">
+                    <button className="row-action" title="Edit product" onClick={() => onEdit(p)}><Pencil size={15} /></button>
+                    <button className="row-action row-delete" title="Delete product" onClick={() => onDelete(p)}><Trash2 size={15} /></button>
+                  </div>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
